@@ -29,7 +29,7 @@ git clone [repository URL]
 
 # 필요 패키지 설치  
 pip install -r requirements.txt
-
+```
 ## 🚀 실행 방법
 python main.py
 
