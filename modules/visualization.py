@@ -1,13 +1,34 @@
 import cv2
 from config.settings import (
-    SCREEN_HEIGHT, SCREEN_WIDTH, WEBCAM_DISPLAY_SIZE,
-    CURSOR_COLOR, CURSOR_SIZE
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
+    SKELETON_WIDTH,
+    SKELETON_HEIGHT,
+    BOX_PADDING
 )
 
 
 class Visualizer:
     def __init__(self):
-        self.window_name = 'Desktop Control with Hand Tracking'
+        # 우측 하단에 고정할 스켈레톤 창의 위치와 크기
+        self.skeleton_width = SKELETON_WIDTH
+        self.skeleton_height = SKELETON_HEIGHT
+        self.skeleton_x = SCREEN_WIDTH - self.skeleton_width - 20
+        self.skeleton_y = SCREEN_HEIGHT - self.skeleton_height - 20
+
+        # 바운딩 박스 영역 정의
+        self.box_padding = BOX_PADDING
+        self.box_x = self.skeleton_x - self.box_padding
+        self.box_y = self.skeleton_y - self.box_padding
+        self.box_width = self.skeleton_width + (self.box_padding * 2)
+        self.box_height = self.skeleton_height + (self.box_padding * 2)
+
+    def draw_bounding_box(self, frame):
+        """바운딩 박스 그리기"""
+        cv2.rectangle(frame,
+                      (self.box_x, self.box_y),
+                      (self.box_x + self.box_width, self.box_y + self.box_height),
+                      (255, 0, 0), 2)
 
     def prepare_display(self, desktop_frame, webcam_frame):
         """디스플레이 프레임 준비"""

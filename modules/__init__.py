@@ -8,6 +8,5 @@ __all__ = [
     'HandTracker',
     'GestureRecognizer',
     'MouseController',
-    'Visualizer',
     'VoiceRecognizer'
 ]
