@@ -26,3 +26,8 @@ SKELETON_COLOR = (0, 255, 0)  # 스켈레톤 선 색상 (녹색)
 SKELETON_THICKNESS = 2  # 스켈레톤 선 두께
 BOX_COLOR = (0, 255, 0)  # 바운딩 박스 색상 (녹색)
 BOX_THICKNESS = 2  # 바운딩 박스 선 두께
+
+#시간 관련 상수
+HOVER_CLICK_DELAY = 1.0  # 자동 클릭을 위한 호버 시간
+POSITION_LOCK_TIME = 0.3  # 핀치를 위한 위치 고정 시간
+MOVEMENT_THRESHOLD = 5  # 마우스 이동 감지를 위한 픽셀 임계값

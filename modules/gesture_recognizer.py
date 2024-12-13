@@ -22,6 +22,10 @@ class GestureRecognizer:
         self.DRAG_THRESHOLD = 0.5  # 드래그 인식을 위한 핀치 유지 시간
         self.DISTANCE_CHANGE_THRESHOLD = 0.03  # 핀치 의도 감지를 위한 거리 변화율 임계값
 
+        # 위치 고정 관련 추가
+        self.position_locked = False
+        self.locked_position = None
+
     def is_pinching(self, hand_landmarks):
         """엄지와 검지 손가락이 핀치 동작을 하고 있는지 확인"""
         thumb_tip = hand_landmarks.landmark[4]  # 엄지 끝
@@ -62,13 +66,15 @@ class GestureRecognizer:
             return True
         return False
 
-    def update_gesture_state(self, hand_landmarks):
+    def update_gesture_state(self, hand_landmarks, is_position_locked=False, locked_position=None):
         """제스처 상태 업데이트 및 동작 결정"""
         current_time = time.time()
         is_pinching = self.is_pinching(hand_landmarks)
 
-        # 핀치 의도 감지
-        self.detect_pinch_intent(hand_landmarks)
+        # 위치 고정 상태 업데이트
+        self.position_locked = is_position_locked
+        if is_position_locked:
+            self.locked_position = locked_position
 
         # 핀치 동작 처리
         if is_pinching and not self.was_clicking:
@@ -81,22 +87,25 @@ class GestureRecognizer:
             self.pinch_start_time = current_time
             self.last_click_time = current_time
 
+            # 위치가 고정된 상태라면 해당 위치 사용
+            if self.position_locked and self.locked_position:
+                self.intent_detected_position = self.locked_position
+
         elif is_pinching and self.was_clicking:
-            # 핀치 유지 중
             if current_time - self.pinch_start_time > self.DRAG_THRESHOLD:
                 self.is_dragging = True
-                return "DRAG", self.intent_detected_position
+                return "DRAG", self.intent_detected_position or self.locked_position
 
         elif not is_pinching and self.was_clicking:
-            # 핀치 해제
+            click_position = self.intent_detected_position or self.locked_position
             if self.is_dragging:
                 self.is_dragging = False
-                return "DROP", self.intent_detected_position
+                return "DROP", click_position
             elif self.click_count == 2:
                 self.click_count = 0
-                return "DOUBLE_CLICK", self.intent_detected_position
+                return "DOUBLE_CLICK", click_position
             else:
-                return "CLICK", self.intent_detected_position
+                return "CLICK", click_position
 
             self.intent_detected_position = None
             self.pinch_start_time = None
