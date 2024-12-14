@@ -31,7 +31,7 @@ pip install -r requirements.txt
 python main.py
 
 ## 🗂 모듈 구조
-
+```
 ├── config/
 │   └── settings.py         # 환경 설정
 ├── modules/
@@ -41,6 +41,7 @@ python main.py
 ├── utils/
 │   └── math_utils.py       # 수학 유틸리티
 └── main.py                 # 메인 실행 파일
+```
 
 ## 👋 제스처 가이드
 
