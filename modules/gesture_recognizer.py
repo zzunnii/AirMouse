@@ -1,114 +1,146 @@
 import time
+import numpy as np
 from utils.math_utils import calculate_distance
-from config.settings import PINCH_THRESHOLD
+from config.settings import (
+    TAP_THRESHOLD, COORDINATE_STABILITY,
+    CLICK_STABILIZE_TIME, AREA_HEIGHT,
+    SKELETON_HEIGHT
+)
 
 
 class GestureRecognizer:
     def __init__(self):
-        # 핀치 관련 변수
-        self.last_pinch_distance = None
-        self.last_distance_time = None
-        self.distance_history = []  # 거리 변화 추적용
-        self.intent_detected_position = None  # 핀치 의도가 감지된 시점의 위치
-        self.last_click_time = 0  # 더블클릭 감지용
-        self.click_count = 0  # 클릭 횟수
-        self.is_dragging = False  # 드래그 상태
-        self.was_clicking = False
-        self.pinch_start_time = None
+        # 탭 관련 변수
+        self.last_tap_time = 0
+        self.tap_count = 0
+        self.is_tapping = False
+        self.tap_start_time = None
+        self.tap_position = None
+        self.is_dragging = False
+
+        # 좌표 안정화를 위한 변수
+        self.stable_position = None
+        self.position_lock_time = None
+        self.last_positions = []  # 최근 위치 기록 (평균 계산용)
+        self.MAX_POSITIONS = 5  # 평균 계산에 사용할 위치 개수
 
         # 시간 설정
-        self.PINCH_COOLDOWN = 0.3  # 연속 핀치 간격
-        self.DOUBLE_CLICK_TIME = 0.5  # 더블클릭 인식 시간
-        self.DRAG_THRESHOLD = 0.5  # 드래그 인식을 위한 핀치 유지 시간
-        self.DISTANCE_CHANGE_THRESHOLD = 0.03  # 핀치 의도 감지를 위한 거리 변화율 임계값
+        self.TAP_COOLDOWN = 0.3  # 연속 탭 간격
+        self.DOUBLE_TAP_TIME = 0.5  # 더블 탭 인식 시간
+        self.DRAG_THRESHOLD = 0.5  # 드래그 인식을 위한 탭 유지 시간
 
-        # 위치 고정 관련 추가
-        self.position_locked = False
-        self.locked_position = None
-
-    def is_pinching(self, hand_landmarks):
-        """엄지와 검지 손가락이 핀치 동작을 하고 있는지 확인"""
-        thumb_tip = hand_landmarks.landmark[4]  # 엄지 끝
+    def check_index_finger_up(self, hand_landmarks):
+        """검지 손가락이 펴져있는지 확인"""
         index_tip = hand_landmarks.landmark[8]  # 검지 끝
-        return calculate_distance(thumb_tip, index_tip) < PINCH_THRESHOLD
+        index_pip = hand_landmarks.landmark[6]  # 검지 중간 마디 (PIP)
+        index_mcp = hand_landmarks.landmark[5]  # 검지 시작 마디 (MCP)
 
-    def calculate_distance_change_rate(self, current_distance, current_time):
-        """거리 변화율 계산"""
-        if self.last_pinch_distance is None or self.last_distance_time is None:
-            self.last_pinch_distance = current_distance
-            self.last_distance_time = current_time
-            return 0
+        # 다른 손가락들의 끝 마디
+        other_fingers_tips = [
+            hand_landmarks.landmark[12],  # 중지 끝
+            hand_landmarks.landmark[16],  # 약지 끝
+            hand_landmarks.landmark[20]  # 소지 끝
+        ]
 
-        time_diff = current_time - self.last_distance_time
-        if time_diff == 0:
-            return 0
+        # 검지가 펴져있는지 확인
+        is_index_extended = (index_tip.y < index_pip.y < index_mcp.y)
 
-        distance_change = self.last_pinch_distance - current_distance
-        change_rate = distance_change / time_diff
+        # 다른 손가락들이 접혀있는지 확인
+        are_others_folded = all(finger.y > index_pip.y for finger in other_fingers_tips)
 
-        self.last_pinch_distance = current_distance
-        self.last_distance_time = current_time
+        return is_index_extended and are_others_folded
 
-        return change_rate
+    def get_stabilized_position(self, current_pos):
+        """좌표 안정화"""
+        self.last_positions.append(current_pos)
+        if len(self.last_positions) > self.MAX_POSITIONS:
+            self.last_positions.pop(0)
 
-    def detect_pinch_intent(self, hand_landmarks):
-        """핀치 의도 감지"""
+        # 평균 위치 계산
+        avg_pos = np.mean(self.last_positions, axis=0)
+
+        # 현재 위치와 평균 위치를 보간
+        if self.stable_position is None:
+            self.stable_position = avg_pos
+        else:
+            self.stable_position = (
+                    self.stable_position * COORDINATE_STABILITY +
+                    avg_pos * (1 - COORDINATE_STABILITY)
+            )
+
+        return self.stable_position
+
+    def check_thumb_middle_tap(self, hand_landmarks):
+        """엄지와 중지 손가락의 탭 동작 확인"""
         thumb_tip = hand_landmarks.landmark[4]
-        index_tip = hand_landmarks.landmark[8]
-        current_distance = calculate_distance(thumb_tip, index_tip)
-        current_time = time.time()
+        middle_pip = hand_landmarks.landmark[11]  # 중지 두번째 마디
+        return calculate_distance(thumb_tip, middle_pip) < TAP_THRESHOLD
 
-        change_rate = self.calculate_distance_change_rate(current_distance, current_time)
+    def get_area_type(self, y_coord):
+        """현재 손가락이 위치한 영역 확인"""
+        relative_y = y_coord * SKELETON_HEIGHT
+        if relative_y < AREA_HEIGHT:
+            return "SCROLL_UP"
+        elif relative_y > 2 * AREA_HEIGHT:
+            return "SCROLL_DOWN"
+        return "MOUSE"
 
-        # 거리가 빠르게 줄어들기 시작하는 시점 감지
-        if change_rate > self.DISTANCE_CHANGE_THRESHOLD and not self.intent_detected_position:
-            self.intent_detected_position = (index_tip.x, index_tip.y)
-            return True
-        return False
-
-    def update_gesture_state(self, hand_landmarks, is_position_locked=False, locked_position=None):
+    def update_gesture_state(self, hand_landmarks):
         """제스처 상태 업데이트 및 동작 결정"""
+        if not self.check_index_finger_up(hand_landmarks):
+            return None, None
+
         current_time = time.time()
-        is_pinching = self.is_pinching(hand_landmarks)
+        is_tapping_now = self.check_thumb_middle_tap(hand_landmarks)
 
-        # 위치 고정 상태 업데이트
-        self.position_locked = is_position_locked
-        if is_position_locked:
-            self.locked_position = locked_position
+        # 현재 포인터 위치 (검지 끝)
+        current_pos = np.array([
+            hand_landmarks.landmark[8].x,
+            hand_landmarks.landmark[8].y
+        ])
 
-        # 핀치 동작 처리
-        if is_pinching and not self.was_clicking:
-            # 새로운 핀치 시작
-            if current_time - self.last_click_time < self.DOUBLE_CLICK_TIME:
-                self.click_count += 1
+        # 영역 확인
+        area_type = self.get_area_type(current_pos[1])
+        if area_type in ["SCROLL_UP", "SCROLL_DOWN"]:
+            return area_type, current_pos
+
+        # 탭 동작 처리
+        if is_tapping_now and not self.is_tapping:
+            # 새로운 탭 시작
+            if current_time - self.last_tap_time < self.DOUBLE_TAP_TIME:
+                self.tap_count += 1
             else:
-                self.click_count = 1
+                self.tap_count = 1
 
-            self.pinch_start_time = current_time
-            self.last_click_time = current_time
+            self.tap_start_time = current_time
+            self.last_tap_time = current_time
+            self.position_lock_time = current_time
+            self.tap_position = self.get_stabilized_position(current_pos)
 
-            # 위치가 고정된 상태라면 해당 위치 사용
-            if self.position_locked and self.locked_position:
-                self.intent_detected_position = self.locked_position
-
-        elif is_pinching and self.was_clicking:
-            if current_time - self.pinch_start_time > self.DRAG_THRESHOLD:
+        elif is_tapping_now and self.is_tapping:
+            # 드래그 시작
+            if not self.is_dragging and \
+                    current_time - self.tap_start_time > self.DRAG_THRESHOLD:
                 self.is_dragging = True
-                return "DRAG", self.intent_detected_position or self.locked_position
+                return "DRAG", self.tap_position
 
-        elif not is_pinching and self.was_clicking:
-            click_position = self.intent_detected_position or self.locked_position
+        elif not is_tapping_now and self.is_tapping:
+            # 탭 종료
+            gesture_result = None
             if self.is_dragging:
                 self.is_dragging = False
-                return "DROP", click_position
-            elif self.click_count == 2:
-                self.click_count = 0
-                return "DOUBLE_CLICK", click_position
+                gesture_result = ("DROP", self.tap_position)
+            elif self.tap_count == 2:
+                self.tap_count = 0
+                gesture_result = ("CLICK", self.tap_position)
             else:
-                return "CLICK", click_position
+                gesture_result = ("SELECT", self.tap_position)
 
-            self.intent_detected_position = None
-            self.pinch_start_time = None
+            # 상태 초기화
+            self.tap_position = None
+            self.tap_start_time = None
+            self.is_tapping = False
+            return gesture_result
 
-        self.was_clicking = is_pinching
-        return None, None
+        self.is_tapping = is_tapping_now
+        return None, self.get_stabilized_position(current_pos)

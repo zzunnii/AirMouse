@@ -1,6 +1,10 @@
 import cv2
 import mediapipe as mp
-from config.settings import WEBCAM_WIDTH, WEBCAM_HEIGHT
+from config.settings import (
+    SKELETON_COLOR, SKELETON_THICKNESS,
+    SKELETON_WIDTH, SKELETON_HEIGHT
+)
+
 
 class HandTracker:
     def __init__(self):
@@ -16,8 +20,6 @@ class HandTracker:
 
     def setup_webcam(self):
         self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, WEBCAM_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, WEBCAM_HEIGHT)
 
     def get_frame(self):
         success, frame = self.cap.read()
@@ -33,13 +35,33 @@ class HandTracker:
         return results
 
     def draw_landmarks(self, frame, hand_landmarks):
-        self.mp_drawing.draw_landmarks(
-            frame,
-            hand_landmarks,
-            self.mp_hands.HAND_CONNECTIONS,
-            self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=5),
-            self.mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=3)
-        )
+        """스케일이 조정된 스켈레톤 그리기"""
+        scale = 0.7  # 스켈레톤 크기를 70%로 조정
+
+        # 스켈레톤 중심점 계산
+        center_x = sum(lm.x for lm in hand_landmarks.landmark) / len(hand_landmarks.landmark)
+        center_y = sum(lm.y for lm in hand_landmarks.landmark) / len(hand_landmarks.landmark)
+
+        # 스케일이 적용된 랜드마크 그리기
+        connections = self.mp_hands.HAND_CONNECTIONS
+        for connection in connections:
+            start_idx, end_idx = connection
+
+            start = hand_landmarks.landmark[start_idx]
+            end = hand_landmarks.landmark[end_idx]
+
+            # 중심점 기준으로 스케일 조정
+            start_x = int(((start.x - center_x) * scale + center_x) * frame.shape[1])
+            start_y = int(((start.y - center_y) * scale + center_y) * frame.shape[0])
+            end_x = int(((end.x - center_x) * scale + center_x) * frame.shape[1])
+            end_y = int(((end.y - center_y) * scale + center_y) * frame.shape[0])
+
+            cv2.line(frame, (start_x, start_y), (end_x, end_y),
+                     SKELETON_COLOR, SKELETON_THICKNESS)
+
+            # 관절 포인트 그리기
+            cv2.circle(frame, (start_x, start_y), 2, SKELETON_COLOR, -1)
+            cv2.circle(frame, (end_x, end_y), 2, SKELETON_COLOR, -1)
 
     def cleanup(self):
         self.cap.release()
