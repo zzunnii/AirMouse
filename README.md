@@ -28,7 +28,8 @@ pip install -r requirements.txt
 ##🚀 실행 방법
 python main.py
 
-##🗂 모듈 구조
+🗂 모듈 구조
+
 ├── config/
 │   └── settings.py         # 환경 설정
 ├── modules/
