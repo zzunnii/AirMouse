@@ -36,7 +36,7 @@ class HandTracker:
 
     def draw_landmarks(self, frame, hand_landmarks):
         """스케일이 조정된 스켈레톤 그리기"""
-        scale = 0.7  # 스켈레톤 크기를 70%로 조정
+        scale = 0.4  # 스켈레톤 크기를 40%로 축소
 
         # 스켈레톤 중심점 계산
         center_x = sum(lm.x for lm in hand_landmarks.landmark) / len(hand_landmarks.landmark)
@@ -59,9 +59,9 @@ class HandTracker:
             cv2.line(frame, (start_x, start_y), (end_x, end_y),
                      SKELETON_COLOR, SKELETON_THICKNESS)
 
-            # 관절 포인트 그리기
-            cv2.circle(frame, (start_x, start_y), 2, SKELETON_COLOR, -1)
-            cv2.circle(frame, (end_x, end_y), 2, SKELETON_COLOR, -1)
+            # 중요 포인트만 강조
+            if start_idx in [4, 11]:  # 엄지 끝과 중지 두번째 마디
+                cv2.circle(frame, (start_x, start_y), 3, (0, 0, 255), -1)
 
     def cleanup(self):
         self.cap.release()

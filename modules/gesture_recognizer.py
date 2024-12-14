@@ -3,8 +3,8 @@ import numpy as np
 from utils.math_utils import calculate_distance
 from config.settings import (
     TAP_THRESHOLD, COORDINATE_STABILITY,
-    CLICK_STABILIZE_TIME, AREA_HEIGHT,
-    SKELETON_HEIGHT
+    CLICK_STABILIZE_TIME,
+    SKELETON_HEIGHT, DEBUG_MODE
 )
 
 
@@ -70,20 +70,53 @@ class GestureRecognizer:
 
         return self.stable_position
 
-    def check_thumb_middle_tap(self, hand_landmarks):
-        """엄지와 중지 손가락의 탭 동작 확인"""
-        thumb_tip = hand_landmarks.landmark[4]
-        middle_pip = hand_landmarks.landmark[11]  # 중지 두번째 마디
-        return calculate_distance(thumb_tip, middle_pip) < TAP_THRESHOLD
+    def check_scroll_up(self, hand_landmarks):
+        """엄지, 검지, 중지가 모두 펴졌는지 확인"""
+        thumb_tip = hand_landmarks.landmark[4]  # 엄지 끝
+        thumb_mcp = hand_landmarks.landmark[2]  # 엄지 마디
+        index_tip = hand_landmarks.landmark[8]  # 검지 끝
+        index_pip = hand_landmarks.landmark[6]  # 검지 중간 마디
+        middle_tip = hand_landmarks.landmark[12]  # 중지 끝
+        middle_pip = hand_landmarks.landmark[10]  # 중지 중간 마디
 
-    def get_area_type(self, y_coord):
-        """현재 손가락이 위치한 영역 확인"""
-        relative_y = y_coord * SKELETON_HEIGHT
-        if relative_y < AREA_HEIGHT:
-            return "SCROLL_UP"
-        elif relative_y > 2 * AREA_HEIGHT:
-            return "SCROLL_DOWN"
-        return "MOUSE"
+        # 각 손가락이 펴져있는지 확인
+        thumb_extended = thumb_tip.y < thumb_mcp.y
+        index_extended = index_tip.y < index_pip.y
+        middle_extended = middle_tip.y < middle_pip.y
+
+        return thumb_extended and index_extended and middle_extended
+
+    def check_scroll_down(self, hand_landmarks):
+        """엄지만 펴지고 검지 중지는 접혔는지 확인"""
+        thumb_tip = hand_landmarks.landmark[4]  # 엄지 끝
+        thumb_mcp = hand_landmarks.landmark[2]  # 엄지 마디
+        index_tip = hand_landmarks.landmark[8]  # 검지 끝
+        index_pip = hand_landmarks.landmark[6]  # 검지 중간 마디
+        middle_tip = hand_landmarks.landmark[12]  # 중지 끝
+        middle_pip = hand_landmarks.landmark[10]  # 중지 중간 마디
+
+        # 엄지는 펴져있고 나머지는 접혀있는지 확인
+        thumb_extended = thumb_tip.y < thumb_mcp.y
+        index_folded = index_tip.y > index_pip.y
+        middle_folded = middle_tip.y > middle_pip.y
+
+        return thumb_extended and index_folded and middle_folded
+
+    def check_thumb_middle_tap(self, hand_landmarks):
+        """엄지 끝과 중지 중간 마디 사이의 거리 체크"""
+        thumb_tip = hand_landmarks.landmark[4]  # 엄지 끝
+        middle_pip = hand_landmarks.landmark[11]  # 중지 두번째 마디
+
+        distance = calculate_distance(thumb_tip, middle_pip)
+
+        if DEBUG_MODE:
+            # 두 점 위치 디버깅용 출력
+            print(f"Thumb tip position: ({thumb_tip.x}, {thumb_tip.y})")
+            print(f"Middle PIP position: ({middle_pip.x}, {middle_pip.y})")
+            print(f"Distance: {distance}")
+
+        # 임계값 더 관대하게 설정
+        return distance < TAP_THRESHOLD
 
     def update_gesture_state(self, hand_landmarks):
         """제스처 상태 업데이트 및 동작 결정"""
@@ -99,10 +132,6 @@ class GestureRecognizer:
             hand_landmarks.landmark[8].y
         ])
 
-        # 영역 확인
-        area_type = self.get_area_type(current_pos[1])
-        if area_type in ["SCROLL_UP", "SCROLL_DOWN"]:
-            return area_type, current_pos
 
         # 탭 동작 처리
         if is_tapping_now and not self.is_tapping:
