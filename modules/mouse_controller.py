@@ -4,7 +4,7 @@ from config.settings import (
     SCREEN_HEIGHT,
     SKELETON_WIDTH,
     SKELETON_HEIGHT,
-    BOX_PADDING
+    MOVEMENT_SMOOTHING, MOUSEPAD_MARGIN, MOUSE_SENSITIVITY
 )
 
 
@@ -13,28 +13,61 @@ class MouseController:
         pyautogui.FAILSAFE = False
         self.screen_width = SCREEN_WIDTH
         self.screen_height = SCREEN_HEIGHT
-        self.sensitivity = 0.5  # 마우스 감도
+        self.last_x = None
+        self.last_y = None
+
+    def is_in_mousepad(self, x, y):
+        """주어진 좌표가 마우스패드 영역 내에 있는지 확인"""
+        pad_left = MOUSEPAD_MARGIN / SKELETON_WIDTH
+        pad_right = (SKELETON_WIDTH - MOUSEPAD_MARGIN) / SKELETON_WIDTH
+        pad_top = MOUSEPAD_MARGIN / SKELETON_HEIGHT
+        pad_bottom = (SKELETON_HEIGHT - MOUSEPAD_MARGIN) / SKELETON_HEIGHT
+
+        return (pad_left <= x <= pad_right and
+                pad_top <= y <= pad_bottom)
 
     def move_mouse(self, hand_landmark):
-        """손의 움직임을 마우스 커서의 속도로 변환"""
-        # 현재 마우스 위치 가져오기
+        """스켈레톤 전체 영역에서의 마우스 이동"""
         current_x, current_y = pyautogui.position()
 
-        # 손의 움직임을 속도로 변환
-        move_x = hand_landmark.x * SKELETON_WIDTH * self.sensitivity
-        move_y = hand_landmark.y * SKELETON_HEIGHT * self.sensitivity
+        # 현재 손의 좌표
+        x = hand_landmark.x
+        y = hand_landmark.y
 
-        # 새로운 마우스 위치 계산
-        new_x = current_x + int(move_x)
-        new_y = current_y + int(move_y)
+        if self.last_x is not None and self.last_y is not None:
+            # 움직임 변화량 계산
+            delta_x = (x - self.last_x)
+            delta_y = (y - self.last_y)
 
-        # 화면 범위 제한
-        new_x = max(0, min(new_x, self.screen_width))
-        new_y = max(0, min(new_y, self.screen_height))
+            # 미세한 움직임 무시 (노이즈 제거)
+            if abs(delta_x) < 0.001 and abs(delta_y) < 0.001:
+                return current_x, current_y
 
-        # 마우스 이동
-        pyautogui.moveTo(new_x, new_y)
-        return new_x, new_y
+
+            # 실제 화면 크기에 맞게 스케일링
+            scaled_delta_x = delta_x * SCREEN_WIDTH * MOUSE_SENSITIVITY
+            scaled_delta_y = delta_y * SCREEN_HEIGHT * MOUSE_SENSITIVITY
+
+            # 움직임 부드럽게 (더 낮은 값으로 조정)
+            smoothed_delta_x = scaled_delta_x * 0.3  # MOVEMENT_SMOOTHING 값도 낮춤
+            smoothed_delta_y = scaled_delta_y * 0.3
+
+            # 새로운 마우스 위치 계산
+            new_x = current_x + int(smoothed_delta_x)
+            new_y = current_y + int(smoothed_delta_y)
+
+            # 화면 범위 제한
+            new_x = max(0, min(new_x, self.screen_width))
+            new_y = max(0, min(new_y, self.screen_height))
+
+            # 마우스 이동
+            pyautogui.moveTo(new_x, new_y)
+
+        # 현재 위치를 이전 위치로 저장
+        self.last_x = x
+        self.last_y = y
+
+        return current_x, current_y
 
     def select(self, x=None, y=None):
         """항목 선택 (마우스 클릭)"""
