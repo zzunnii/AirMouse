@@ -55,7 +55,11 @@ python main.py
 
 ### 스크롤:
 ### 위로: 엄지, 검지, 중지 펴기
-![스크린샷 2024-12-15 161008](https://github.com/user-attachments/assets/892e42e7-5adf중
+![스크린샷 2024-12-15 161008](https://github.com/user-attachments/assets/d02a91cf-e498-4581-a128-61f3a62a3455)
+
+### 아래로 : 검지, 중지, 접고 엄지만 펴기
+![스크린샷 2024-12-15 161017](https://github.com/user-attachments/assets/8e94a8d9-1247-45d3-99b8-5ff5ae515d8f)
+
 
 ## 🔜 향후 계획
 
