@@ -3,6 +3,21 @@
 # Virtual Mouse with Hand Gesture
 > 손 제스처를 이용한 가상 마우스 제어 시스템
 
+## 📹실행 장면
+스크롤은 완벽한 기능을 보이지만, 이동과 클릭의 오류가 자주 발생
+
+### 클릭 
+
+
+https://github.com/user-attachments/assets/91ed0449-2cfd-4399-afe6-e1bf84546936
+
+
+### 스크롤 
+
+
+https://github.com/user-attachments/assets/0a089241-812c-43dd-980d-d589b9067bf4
+
+
 ## ✨ 주요 기능
 - 손 제스처를 통한 마우스 커서 제어
 - 엄지-중지 탭 동작을 통한 클릭/드래그 기능
