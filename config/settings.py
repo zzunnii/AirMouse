@@ -36,5 +36,5 @@ DEBUG_MODE = True
 MOUSEPAD_THICKNESS = 1  # 마우스패드 경계선 두께
 
 # 마우스 감도 설정
-MOUSE_SENSITIVITY = 6.0  # 감도 증가
+MOUSE_SENSITIVITY = 15.0  # 감도 증가
 MOVEMENT_SMOOTHING = 1.0  # 부드러움 감소로 반응성 향상
